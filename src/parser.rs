@@ -1,7 +1,8 @@
 use crate::{Entry, JMDict, Kana, Kanji, PriRef};
-use roxmltree::Document;
+use roxmltree::{Document, Node};
 use std::fs;
 use std::io;
+use std::num;
 use std::str::FromStr;
 
 const SEQ: &str = "ent_seq";
@@ -12,91 +13,89 @@ const R_ELE: &str = "r_ele";
 const REB: &str = "reb";
 const RE_PRI: &str = "re_pri";
 
+#[inline]
 pub fn full_parse(filepath: &str) -> Result<JMDict, ParserError> {
     let contents = read_file(filepath)?;
     let doc = Document::parse(&contents)?;
+
     let entries: Vec<_> = doc
-        .descendants()
+        .root_element()
+        .children()
+        .filter(|n| n.is_element())
         .map(|n| parse_entry(n))
-        .filter_map(|x| x.ok())
-        .collect();
+        .collect::<Result<Vec<_>, _>>()?;
 
     return Ok(JMDict { entries });
 }
 
-fn parse_entry(n: roxmltree::Node) -> Result<Entry, ParserError> {
+#[inline]
+fn parse_entry(n: Node) -> Result<Entry, ParserError> {
     let mut kana = Vec::new();
     let mut kanji = Vec::new();
 
-    macro_rules! unwrap_text {
-        ($text:expr) => {
-            match $text {
-                Some(s) => s,
-                None => return Err(ParserError::MissingText),
-            };
-        };
-    }
-
     let seq: i32 = {
-        let seq_tag = n.children().find(|p| p.tag_name().name() == SEQ);
-        let seq_text = match seq_tag {
-            Some(t) => t.text(),
-            None => return Err(ParserError::MissingTag(SEQ.to_owned())),
-        };
+        let seq_text = find_child_tag(n, SEQ).and_then(|t| t.text());
 
-        match unwrap_text!(seq_text).parse() {
-            Ok(i) => i,
-            Err(_) => return Err(ParserError::MissingText),
+        match seq_text {
+            Some(t) => t.parse()?,
+            // None => return Err(ParserError::MissingTag(SEQ.to_owned())),
+            None => 0,
         }
     };
 
-    for elem in n.children() {
-        let tag = elem.tag_name().name();
-
-        let text = elem.text();
+    for c in n.children() {
+        let tag = c.tag_name().name();
+        let text = c.text();
 
         if text == None {
             continue;
         }
 
         if tag == K_ELE {
-            let keb = match elem.children().find(|c| c.tag_name().name() == KEB) {
-                Some(k) => unwrap_text!(k.text()),
-                None => return Err(ParserError::MissingTag(KEB.to_owned())),
-            };
-
-            let ke_pri = elem
-                .children()
-                .find(|c| c.tag_name().name() == KE_PRI)
-                .and_then(|k| k.text())
-                .and_then(|t| PriRef::from_str(t).ok());
-
-            kanji.push(Kanji {
-                text: keb.to_owned(),
-                pri_ref: ke_pri,
-            });
+            kanji.push(parse_kanji(c)?);
         }
 
         if tag == R_ELE {
-            let reb = match elem.first_element_child() {
-                Some(r) => unwrap_text!(r.text()),
-                None => return Err(ParserError::MissingTag(REB.to_owned())),
-            };
-
-            let re_pri = elem
-                .children()
-                .find(|c| c.tag_name().name() == RE_PRI)
-                .and_then(|r| r.text())
-                .and_then(|t| PriRef::from_str(t).ok());
-
-            kana.push(Kana {
-                text: reb.to_owned(),
-                pri_ref: re_pri,
-            });
+            kana.push(parse_kana(c)?)
         }
     }
 
     Ok(Entry { seq, kana, kanji })
+}
+
+#[inline]
+fn parse_kanji(n: Node) -> Result<Kanji, ParserError> {
+    let keb_node = find_child_tag(n, KEB).ok_or(ParserError::MissingTag(KEB.to_owned()))?;
+    let keb = keb_node.text().ok_or(ParserError::MissingText)?;
+
+    let ke_pri = find_child_tag(n, KE_PRI)
+        .and_then(|k| k.text())
+        .and_then(|t| PriRef::from_str(t).ok());
+
+    Ok(Kanji {
+        text: keb.to_owned(),
+        pri_ref: ke_pri,
+    })
+}
+
+#[inline]
+fn parse_kana(n: Node) -> Result<Kana, ParserError> {
+    let reb_node = find_child_tag(n, REB).ok_or(ParserError::MissingTag(REB.to_owned()))?;
+    let reb = reb_node.text().ok_or(ParserError::MissingText)?;
+
+    let re_pri = find_child_tag(n, RE_PRI)
+        .and_then(|r| r.text())
+        .and_then(|t| PriRef::from_str(t).ok());
+
+    Ok(Kana {
+        text: reb.to_owned(),
+        pri_ref: re_pri,
+    })
+}
+
+#[inline]
+fn find_child_tag<'a>(n: Node<'a, 'a>, tag_name: &str) -> Option<Node<'a, 'a>> {
+    n.children().find(|c| c.tag_name().name() == tag_name)
 }
 
 fn read_file(filepath: &str) -> Result<String, io::Error> {
@@ -109,7 +108,7 @@ pub enum ParserError {
     XML(roxmltree::Error),
     MissingTag(String),
     MissingText,
-    InvalidValue(String, String),
+    ParseInt(num::ParseIntError),
 }
 
 impl From<io::Error> for ParserError {
@@ -121,5 +120,11 @@ impl From<io::Error> for ParserError {
 impl From<roxmltree::Error> for ParserError {
     fn from(error: roxmltree::Error) -> Self {
         ParserError::XML(error)
+    }
+}
+
+impl From<num::ParseIntError> for ParserError {
+    fn from(error: num::ParseIntError) -> Self {
+        ParserError::ParseInt(error)
     }
 }
