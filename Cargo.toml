@@ -1,0 +1,8 @@
+[package]
+name = "jadc"
+version = "0.1.0"
+authors = ["Eric Zhao <21zhaoe@protonmail.com>"]
+edition = "2018"
+
+[dependencies]
+roxmltree = "0.11.0"
