@@ -1,17 +1,49 @@
-use crate::{Entry, JMDict, Kana, Kanji, PriRef};
-use roxmltree::{Document, Node};
+use crate::{Entry, Gloss, JMDict, Kanji, LSource, Reading, Sense};
+use roxmltree::{Document, Node, NS_XML_URI};
+use std::borrow::Cow;
 use std::fs;
 use std::io;
 use std::num;
-use std::str::FromStr;
 
-const SEQ: &str = "ent_seq";
-const K_ELE: &str = "k_ele";
-const KEB: &str = "keb";
-const KE_PRI: &str = "ke_pri";
-const R_ELE: &str = "r_ele";
-const REB: &str = "reb";
-const RE_PRI: &str = "re_pri";
+macro_rules! const_strs {
+    ( $( $id:ident : $val:expr ),* $(,)? ) => {
+        $(const $id: &str = $val;)*
+    };
+}
+
+const_strs!(
+    SEQ: "ent_seq",
+
+    KANJI_ELE: "k_ele",
+    KANJI_TEXT: "keb",
+    KANJI_PRI: "ke_pri",
+
+    READING_ELE: "r_ele",
+    READING_TEXT: "reb",
+    READING_PRI: "re_pri",
+
+    SENSE: "sense",
+    RESTRICT_KANJI: "stagk",
+    RESTRICT_READING: "stagr",
+    CROSS_REF: "xref",
+    ANTONYM: "ant",
+    POS: "pos",
+    FIELD: "field",
+    MISC: "misc",
+    DIALECT: "dial",
+
+    LSOURCE: "lsource",
+    LSOURCE_LANG_SUFFIX: "lang",
+    LSOURCE_LANG_DEF: "eng",
+    LSOURCE_TYPE: "ls_type",
+    LSOURCE_WASEI: "ls_wasei",
+
+    GLOSS: "gloss",
+    GLOSS_LANG_SUFFIX: "lang",
+    GLOSS_LANG_DEFAULT: "eng",
+    GLOSS_GENDER: "g_gend",
+    GLOSS_TYPE: "g_type"
+);
 
 #[inline]
 pub fn full_parse(filepath: &str) -> Result<JMDict, ParserError> {
@@ -30,8 +62,9 @@ pub fn full_parse(filepath: &str) -> Result<JMDict, ParserError> {
 
 #[inline]
 fn parse_entry(n: Node) -> Result<Entry, ParserError> {
-    let mut kana = Vec::new();
+    let mut reading = Vec::new();
     let mut kanji = Vec::new();
+    let mut sense = Vec::new();
 
     let seq: i32 = {
         let seq_text = find_child_tag(n, SEQ).and_then(|t| t.text());
@@ -50,26 +83,52 @@ fn parse_entry(n: Node) -> Result<Entry, ParserError> {
             continue;
         }
 
-        if tag == K_ELE {
+        if tag == KANJI_ELE {
             kanji.push(parse_kanji(c)?);
         }
 
-        if tag == R_ELE {
-            kana.push(parse_kana(c)?)
+        if tag == READING_ELE {
+            reading.push(parse_reading(c)?)
+        }
+
+        if tag == SENSE {
+            sense.push(parse_sense(c)?)
         }
     }
 
-    Ok(Entry { seq, kana, kanji })
+    Ok(Entry {
+        seq,
+        reading,
+        kanji,
+        sense,
+    })
+}
+
+#[inline]
+fn parse_reading(n: Node) -> Result<Reading, ParserError> {
+    let reb_node =
+        find_child_tag(n, READING_TEXT).ok_or(ParserError::MissingTag(READING_TEXT.to_owned()))?;
+    let reb = reb_node.text().ok_or(ParserError::MissingText)?;
+
+    let re_pri = find_child_tag(n, READING_PRI)
+        .and_then(|r| r.text())
+        .and_then(|t| t.parse().ok());
+
+    Ok(Reading {
+        text: reb.to_owned(),
+        pri_ref: re_pri,
+    })
 }
 
 #[inline]
 fn parse_kanji(n: Node) -> Result<Kanji, ParserError> {
-    let keb_node = find_child_tag(n, KEB).ok_or(ParserError::MissingTag(KEB.to_owned()))?;
+    let keb_node =
+        find_child_tag(n, KANJI_TEXT).ok_or(ParserError::MissingTag(KANJI_TEXT.to_owned()))?;
     let keb = keb_node.text().ok_or(ParserError::MissingText)?;
 
-    let ke_pri = find_child_tag(n, KE_PRI)
+    let ke_pri = find_child_tag(n, KANJI_PRI)
         .and_then(|k| k.text())
-        .and_then(|t| PriRef::from_str(t).ok());
+        .and_then(|t| t.parse().ok());
 
     Ok(Kanji {
         text: keb.to_owned(),
@@ -78,23 +137,83 @@ fn parse_kanji(n: Node) -> Result<Kanji, ParserError> {
 }
 
 #[inline]
-fn parse_kana(n: Node) -> Result<Kana, ParserError> {
-    let reb_node = find_child_tag(n, REB).ok_or(ParserError::MissingTag(REB.to_owned()))?;
-    let reb = reb_node.text().ok_or(ParserError::MissingText)?;
+fn parse_sense(n: Node) -> Result<Sense, ParserError> {
+    let mut sense = Sense {
+        restrict_reading: Vec::new(),
+        restrict_kanji: Vec::new(),
+        cross_refs: Vec::new(),
+        antonyms: Vec::new(),
+        pos: Vec::new(),
+        fields: Vec::new(),
+        misc: Vec::new(),
+        gloss: Vec::new(),
+        source_lang: Vec::new(),
+        dialects: Vec::new(),
+    };
 
-    let re_pri = find_child_tag(n, RE_PRI)
-        .and_then(|r| r.text())
-        .and_then(|t| PriRef::from_str(t).ok());
+    for c in n.children() {
+        let tag = c.tag_name().name();
+        let text = get_node_text(c);
+        match tag {
+            RESTRICT_READING => sense.restrict_reading.push(text?.into_owned()),
+            RESTRICT_KANJI => sense.restrict_kanji.push(text?.into_owned()),
+            CROSS_REF => sense.cross_refs.push(text?.into_owned()),
+            ANTONYM => sense.antonyms.push(text?.into_owned()),
+            POS => sense.pos.push(text?.into_owned()),
+            FIELD => sense.fields.push(text?.into_owned()),
+            MISC => sense.misc.push(text?.into_owned()),
+            DIALECT => sense.dialects.push(text?.into_owned()),
+            LSOURCE => {
+                let content = text.ok().and_then(|t| Some(t.into_owned()));
+                let lang = c
+                    .attribute(ns_xml_attr(LSOURCE_LANG_SUFFIX))
+                    .unwrap_or_else(|| LSOURCE_LANG_DEF)
+                    .to_owned();
+                let full = c.attribute(LSOURCE_TYPE).map_or(true, |_| false);
+                let wasei = c.attribute(LSOURCE_WASEI).map_or(false, |_| true);
 
-    Ok(Kana {
-        text: reb.to_owned(),
-        pri_ref: re_pri,
-    })
+                sense.source_lang.push(LSource {
+                    content,
+                    lang,
+                    full,
+                    wasei,
+                });
+            }
+            GLOSS => {
+                let content = text.ok().and_then(|t| Some(t.into_owned()));
+                let lang = c
+                    .attribute(ns_xml_attr(GLOSS_LANG_SUFFIX))
+                    .unwrap_or_else(|| GLOSS_LANG_DEFAULT)
+                    .to_owned();
+                let gender = c.attribute(GLOSS_GENDER).and_then(|g| Some(g.to_owned()));
+                let typ = c.attribute(GLOSS_TYPE).and_then(|t| Some(t.to_owned()));
+                sense.gloss.push(Gloss {
+                    content,
+                    lang,
+                    gender,
+                    typ,
+                });
+            }
+            _ => {}
+        }
+    }
+
+    Ok(sense)
 }
 
 #[inline]
 fn find_child_tag<'a>(n: Node<'a, 'a>, tag_name: &str) -> Option<Node<'a, 'a>> {
     n.children().find(|c| c.tag_name().name() == tag_name)
+}
+
+#[inline]
+fn get_node_text<'a>(n: Node<'a, 'a>) -> Result<Cow<'a, str>, ParserError> {
+    n.text().ok_or(ParserError::MissingText).map(|t| t.into())
+}
+
+#[inline]
+fn ns_xml_attr(attr: &str) -> (&str, &str) {
+    (NS_XML_URI, attr)
 }
 
 fn read_file(filepath: &str) -> Result<String, io::Error> {

@@ -10,8 +10,9 @@ pub struct JMDict {
 #[derive(Debug)]
 pub struct Entry {
     seq: i32,
-    kana: Vec<Kana>,
+    reading: Vec<Reading>,
     kanji: Vec<Kanji>,
+    sense: Vec<Sense>,
 }
 
 #[derive(Debug)]
@@ -21,7 +22,7 @@ pub struct Kanji {
 }
 
 #[derive(Debug)]
-pub struct Kana {
+pub struct Reading {
     text: String,
     pri_ref: Option<PriRef>,
 }
@@ -64,5 +65,57 @@ impl FromStr for PriRef {
                 }
             }
         }
+    }
+}
+
+#[derive(Debug)]
+pub struct Sense {
+    restrict_reading: Vec<String>,
+    restrict_kanji: Vec<String>,
+    cross_refs: Vec<String>,
+    gloss: Vec<Gloss>,
+    antonyms: Vec<String>,
+    pos: Vec<String>,
+    fields: Vec<String>,
+    misc: Vec<String>,
+    source_lang: Vec<LSource>,
+    dialects: Vec<String>,
+}
+
+#[derive(Debug)]
+pub struct Gloss {
+    content: Option<String>,
+    lang: String,
+    gender: Option<String>,
+    typ: Option<String>,
+}
+
+#[derive(Debug)]
+pub struct LSource {
+    content: Option<String>,
+    lang: String,
+    // The full attribute indicates whether the source language
+    // fully or partially describes the source word or phrase of the
+    // loanword. If absent, it will have the implied value of "full".
+    full: bool,
+    // The wasei attribute indicates that the Japanese word
+    // has been constructed from words in the source language, and
+    // not from an actual phrase in that language. Most commonly used to
+    // indicate "waseieigo".
+    wasei: bool,
+}
+
+#[cfg(test)]
+mod test {
+    use crate::parser;
+    use std::env;
+
+    #[test]
+    fn test_works() {
+        let cwd = env::current_dir().unwrap();
+        let jmdict = cwd.join("JMDict.xml");
+        let path = jmdict.to_str().unwrap();
+
+        parser::full_parse(path).unwrap();
     }
 }
