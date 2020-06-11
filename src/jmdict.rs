@@ -177,22 +177,22 @@ const_strs!(
     GLOSS_TYPE: "g_type"
 );
 
-#[inline]
-pub fn full_parse(filepath: &str) -> Result<JMDict, ParserError> {
-    let contents = read_file(filepath)?;
-    let doc = Document::parse(&contents)?;
+impl JMDict {
+    pub fn from_file(filepath: &str) -> Result<Self, ParserError> {
+        let contents = read_file(filepath)?;
+        let doc = Document::parse(&contents)?;
 
-    let entries: Vec<_> = doc
-        .root_element()
-        .children()
-        .filter(|n| n.is_element())
-        .map(|n| parse_entry(n))
-        .collect::<Result<Vec<_>, _>>()?;
+        let entries: Vec<_> = doc
+            .root_element()
+            .children()
+            .filter(|n| n.is_element())
+            .map(|n| parse_entry(n))
+            .collect::<Result<Vec<_>, _>>()?;
 
-    return Ok(JMDict { entries });
+        return Ok(JMDict { entries });
+    }
 }
 
-#[inline]
 fn parse_entry(n: Node) -> Result<Entry, ParserError> {
     let mut reading = Vec::new();
     let mut kanji = Vec::new();
@@ -236,7 +236,6 @@ fn parse_entry(n: Node) -> Result<Entry, ParserError> {
     })
 }
 
-#[inline]
 fn parse_reading(n: Node) -> Result<Reading, ParserError> {
     let reb_node =
         find_child_tag(n, READING_TEXT).ok_or(ParserError::MissingTag(READING_TEXT.to_owned()))?;
@@ -252,7 +251,6 @@ fn parse_reading(n: Node) -> Result<Reading, ParserError> {
     })
 }
 
-#[inline]
 fn parse_kanji(n: Node) -> Result<Kanji, ParserError> {
     let keb_node =
         find_child_tag(n, KANJI_TEXT).ok_or(ParserError::MissingTag(KANJI_TEXT.to_owned()))?;
@@ -268,7 +266,6 @@ fn parse_kanji(n: Node) -> Result<Kanji, ParserError> {
     })
 }
 
-#[inline]
 fn parse_sense(n: Node) -> Result<Sense, ParserError> {
     let mut sense = Sense {
         restrict_reading: Vec::new(),
@@ -335,17 +332,14 @@ fn parse_sense(n: Node) -> Result<Sense, ParserError> {
     Ok(sense)
 }
 
-#[inline]
 fn find_child_tag<'a>(n: Node<'a, 'a>, tag_name: &str) -> Option<Node<'a, 'a>> {
     n.children().find(|c| c.tag_name().name() == tag_name)
 }
 
-#[inline]
 fn get_node_text<'a>(n: Node<'a, 'a>) -> Result<Cow<'a, str>, ParserError> {
     n.text().ok_or(ParserError::MissingText).map(|t| t.into())
 }
 
-#[inline]
 fn ns_xml_attr(attr: &str) -> (&str, &str) {
     (NS_XML_URI, attr)
 }
