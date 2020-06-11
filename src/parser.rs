@@ -38,8 +38,7 @@ fn parse_entry(n: Node) -> Result<Entry, ParserError> {
 
         match seq_text {
             Some(t) => t.parse()?,
-            // None => return Err(ParserError::MissingTag(SEQ.to_owned())),
-            None => 0,
+            None => return Err(ParserError::MissingTag(SEQ.to_owned())),
         }
     };
 
