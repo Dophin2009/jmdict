@@ -7,27 +7,27 @@ use std::str::FromStr;
 
 #[derive(Debug)]
 pub struct JMDict {
-    entries: Vec<Entry>,
+    pub entries: Vec<Entry>,
 }
 
 #[derive(Debug)]
 pub struct Entry {
-    seq: i32,
-    reading: Vec<Reading>,
-    kanji: Vec<Kanji>,
-    sense: Vec<Sense>,
+    pub seq: i32,
+    pub reading: Vec<Reading>,
+    pub kanji: Vec<Kanji>,
+    pub sense: Vec<Sense>,
 }
 
 #[derive(Debug)]
 pub struct Kanji {
-    text: String,
-    pri_ref: Option<PriRef>,
+    pub text: String,
+    pub pri_ref: Option<PriRef>,
 }
 
 #[derive(Debug)]
 pub struct Reading {
-    text: String,
-    pri_ref: Option<PriRef>,
+    pub text: String,
+    pub pri_ref: Option<PriRef>,
 }
 
 #[derive(Debug)]
@@ -73,40 +73,76 @@ impl FromStr for PriRef {
 
 #[derive(Debug)]
 pub struct Sense {
-    restrict_reading: Vec<String>,
-    restrict_kanji: Vec<String>,
-    cross_refs: Vec<String>,
-    gloss: Vec<Gloss>,
-    antonyms: Vec<String>,
-    pos: Vec<String>,
-    fields: Vec<String>,
-    misc: Vec<String>,
-    source_lang: Vec<LSource>,
-    dialects: Vec<String>,
-    info: Vec<String>,
+    pub restrict_reading: Vec<String>,
+    pub restrict_kanji: Vec<String>,
+    pub cross_refs: Vec<String>,
+    pub gloss: Vec<Gloss>,
+    pub antonyms: Vec<String>,
+    pub pos: Vec<String>,
+    pub fields: Vec<String>,
+    pub misc: Vec<String>,
+    pub source_lang: Vec<LSource>,
+    pub dialects: Vec<String>,
+    pub info: Vec<String>,
 }
 
 #[derive(Debug)]
 pub struct Gloss {
-    content: Option<String>,
-    lang: String,
-    gender: Option<String>,
-    typ: Option<String>,
+    pub content: Option<String>,
+    pub lang: String,
+    pub gender: Option<String>,
+    pub typ: Option<String>,
 }
 
 #[derive(Debug)]
 pub struct LSource {
-    content: Option<String>,
-    lang: String,
+    pub content: Option<String>,
+    pub lang: String,
     // The full attribute indicates whether the source language
     // fully or partially describes the source word or phrase of the
     // loanword. If absent, it will have the implied value of "full".
-    full: bool,
+    pub full: bool,
     // The wasei attribute indicates that the Japanese word
     // has been constructed from words in the source language, and
     // not from an actual phrase in that language. Most commonly used to
     // indicate "waseieigo".
-    wasei: bool,
+    pub wasei: bool,
+}
+
+impl JMDict {
+    pub fn search(&self, phrase: &str) -> Vec<&Entry> {
+        self.entries
+            .iter()
+            .filter(|e| {
+                e.reading.iter().any(|r| r.text == phrase)
+                    || e.kanji.iter().any(|k| k.text == phrase)
+            })
+            .collect()
+    }
+
+    pub fn search_gloss_strict(&self, phrase: &str) -> Vec<&Entry> {
+        self.search_gloss_internal(phrase, true)
+    }
+
+    pub fn search_gloss(&self, phrase: &str) -> Vec<&Entry> {
+        self.search_gloss_internal(phrase, false)
+    }
+
+    fn search_gloss_internal(&self, phrase: &str, strict: bool) -> Vec<&Entry> {
+        let mut predicate: Box<dyn FnMut(&Gloss) -> bool> = if strict {
+            Box::new(|g| g.content == Some(phrase.to_owned()))
+        } else {
+            Box::new(|g| match &g.content {
+                Some(t) => t.contains(phrase),
+                None => false,
+            })
+        };
+
+        self.entries
+            .iter()
+            .filter(|e| e.sense.iter().flat_map(|s| &s.gloss).any(|g| predicate(g)))
+            .collect()
+    }
 }
 
 #[derive(Debug)]
