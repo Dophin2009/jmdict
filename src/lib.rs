@@ -80,6 +80,7 @@ pub struct Sense {
     misc: Vec<String>,
     source_lang: Vec<LSource>,
     dialects: Vec<String>,
+    info: Vec<String>,
 }
 
 #[derive(Debug)]

@@ -31,6 +31,7 @@ const_strs!(
     FIELD: "field",
     MISC: "misc",
     DIALECT: "dial",
+    INFO: "s_inf",
 
     LSOURCE: "lsource",
     LSOURCE_LANG_SUFFIX: "lang",
@@ -149,6 +150,7 @@ fn parse_sense(n: Node) -> Result<Sense, ParserError> {
         gloss: Vec::new(),
         source_lang: Vec::new(),
         dialects: Vec::new(),
+        info: Vec::new(),
     };
 
     for c in n.children() {
@@ -163,6 +165,7 @@ fn parse_sense(n: Node) -> Result<Sense, ParserError> {
             FIELD => sense.fields.push(text?.into_owned()),
             MISC => sense.misc.push(text?.into_owned()),
             DIALECT => sense.dialects.push(text?.into_owned()),
+            INFO => sense.info.push(text?.into_owned()),
             LSOURCE => {
                 let content = text.ok().and_then(|t| Some(t.into_owned()));
                 let lang = c
