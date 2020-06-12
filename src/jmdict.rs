@@ -1,8 +1,6 @@
-use roxmltree::{Document, Node, NS_XML_URI};
-use std::borrow::Cow;
-use std::fs;
-use std::io;
-use std::num;
+use crate::errors::ParserError;
+use crate::util;
+use roxmltree::{Document, Node};
 use std::str::FromStr;
 
 #[derive(Debug)]
@@ -167,39 +165,6 @@ impl JMDict {
     }
 }
 
-#[derive(Debug)]
-pub enum ParserError {
-    File(io::Error),
-    XML(roxmltree::Error),
-    MissingTag(String),
-    MissingText,
-    ParseInt(num::ParseIntError),
-}
-
-impl From<io::Error> for ParserError {
-    fn from(error: io::Error) -> Self {
-        ParserError::File(error)
-    }
-}
-
-impl From<roxmltree::Error> for ParserError {
-    fn from(error: roxmltree::Error) -> Self {
-        ParserError::XML(error)
-    }
-}
-
-impl From<num::ParseIntError> for ParserError {
-    fn from(error: num::ParseIntError) -> Self {
-        ParserError::ParseInt(error)
-    }
-}
-
-macro_rules! const_strs {
-    ( $( $id:ident : $val:expr ),* $(,)? ) => {
-        $(const $id: &str = $val;)*
-    };
-}
-
 const_strs!(
     SEQ: "ent_seq",
 
@@ -237,7 +202,7 @@ const_strs!(
 
 impl JMDict {
     pub fn from_file(filepath: &str) -> Result<Self, ParserError> {
-        let contents = read_file(filepath)?;
+        let contents = util::read_file(filepath)?;
         let doc = Document::parse(&contents)?;
 
         let entries: Vec<_> = doc
@@ -257,7 +222,7 @@ fn parse_entry(n: Node) -> Result<Entry, ParserError> {
     let mut sense = Vec::new();
 
     let seq: i32 = {
-        let seq_text = find_child_tag(n, SEQ).and_then(|t| t.text());
+        let seq_text = util::find_child_tag(n, SEQ).and_then(|t| t.text());
 
         match seq_text {
             Some(t) => t.parse()?,
@@ -295,11 +260,11 @@ fn parse_entry(n: Node) -> Result<Entry, ParserError> {
 }
 
 fn parse_reading(n: Node) -> Result<Reading, ParserError> {
-    let reb_node =
-        find_child_tag(n, READING_TEXT).ok_or(ParserError::MissingTag(READING_TEXT.to_owned()))?;
+    let reb_node = util::find_child_tag(n, READING_TEXT)
+        .ok_or(ParserError::MissingTag(READING_TEXT.to_owned()))?;
     let reb = reb_node.text().ok_or(ParserError::MissingText)?;
 
-    let re_pri = find_child_tag(n, READING_PRI)
+    let re_pri = util::find_child_tag(n, READING_PRI)
         .and_then(|r| r.text())
         .and_then(|t| t.parse().ok());
 
@@ -310,11 +275,11 @@ fn parse_reading(n: Node) -> Result<Reading, ParserError> {
 }
 
 fn parse_kanji(n: Node) -> Result<Kanji, ParserError> {
-    let keb_node =
-        find_child_tag(n, KANJI_TEXT).ok_or(ParserError::MissingTag(KANJI_TEXT.to_owned()))?;
+    let keb_node = util::find_child_tag(n, KANJI_TEXT)
+        .ok_or(ParserError::MissingTag(KANJI_TEXT.to_owned()))?;
     let keb = keb_node.text().ok_or(ParserError::MissingText)?;
 
-    let ke_pri = find_child_tag(n, KANJI_PRI)
+    let ke_pri = util::find_child_tag(n, KANJI_PRI)
         .and_then(|k| k.text())
         .and_then(|t| t.parse().ok());
 
@@ -341,7 +306,7 @@ fn parse_sense(n: Node) -> Result<Sense, ParserError> {
 
     for c in n.children() {
         let tag = c.tag_name().name();
-        let text = get_node_text(c);
+        let text = util::get_node_text(c);
         match tag {
             RESTRICT_READING => sense.restrict_reading.push(text?.into_owned()),
             RESTRICT_KANJI => sense.restrict_kanji.push(text?.into_owned()),
@@ -355,7 +320,7 @@ fn parse_sense(n: Node) -> Result<Sense, ParserError> {
             LSOURCE => {
                 let content = text.ok().and_then(|t| Some(t.into_owned()));
                 let lang = c
-                    .attribute(ns_xml_attr(LSOURCE_LANG_SUFFIX))
+                    .attribute(util::ns_xml_attr(LSOURCE_LANG_SUFFIX))
                     .unwrap_or_else(|| LSOURCE_LANG_DEF)
                     .to_owned();
                 let full = c.attribute(LSOURCE_TYPE).map_or(true, |_| false);
@@ -371,7 +336,7 @@ fn parse_sense(n: Node) -> Result<Sense, ParserError> {
             GLOSS => {
                 let content = text.ok().and_then(|t| Some(t.into_owned()));
                 let lang = c
-                    .attribute(ns_xml_attr(GLOSS_LANG_SUFFIX))
+                    .attribute(util::ns_xml_attr(GLOSS_LANG_SUFFIX))
                     .unwrap_or_else(|| GLOSS_LANG_DEFAULT)
                     .to_owned();
                 let gender = c.attribute(GLOSS_GENDER).and_then(|g| Some(g.to_owned()));
@@ -388,20 +353,4 @@ fn parse_sense(n: Node) -> Result<Sense, ParserError> {
     }
 
     Ok(sense)
-}
-
-fn find_child_tag<'a>(n: Node<'a, 'a>, tag_name: &str) -> Option<Node<'a, 'a>> {
-    n.children().find(|c| c.tag_name().name() == tag_name)
-}
-
-fn get_node_text<'a>(n: Node<'a, 'a>) -> Result<Cow<'a, str>, ParserError> {
-    n.text().ok_or(ParserError::MissingText).map(|t| t.into())
-}
-
-fn ns_xml_attr(attr: &str) -> (&str, &str) {
-    (NS_XML_URI, attr)
-}
-
-fn read_file(filepath: &str) -> Result<String, io::Error> {
-    fs::read_to_string(filepath)
 }
