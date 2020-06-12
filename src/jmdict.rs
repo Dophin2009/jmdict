@@ -110,6 +110,47 @@ pub struct LSource {
 }
 
 impl JMDict {
+    pub fn find_seq(&self, seq: i32) -> Option<&Entry> {
+        self.entries.iter().find(|e| e.seq == seq)
+    }
+
+    pub fn filter<F>(&self, predicate: F) -> Vec<&Entry>
+    where
+        F: Fn(&Entry) -> bool,
+    {
+        self.entries.iter().filter(|e| predicate(e)).collect()
+    }
+
+    pub fn filter_reading<F>(&self, predicate: F) -> Vec<&Entry>
+    where
+        F: Fn(&Reading) -> bool,
+    {
+        self.entries
+            .iter()
+            .filter(|e| e.reading.iter().any(|r| predicate(r)))
+            .collect()
+    }
+
+    pub fn filter_kanji<F>(&self, predicate: F) -> Vec<&Entry>
+    where
+        F: Fn(&Kanji) -> bool,
+    {
+        self.entries
+            .iter()
+            .filter(|e| e.kanji.iter().any(|k| predicate(k)))
+            .collect()
+    }
+
+    pub fn filter_gloss<F>(&self, predicate: F) -> Vec<&Entry>
+    where
+        F: Fn(&Gloss) -> bool,
+    {
+        self.entries
+            .iter()
+            .filter(|e| e.sense.iter().flat_map(|s| &s.gloss).any(|g| predicate(g)))
+            .collect()
+    }
+
     pub fn search(&self, phrase: &str) -> Vec<&Entry> {
         self.entries
             .iter()
@@ -120,28 +161,9 @@ impl JMDict {
             .collect()
     }
 
-    pub fn search_gloss_strict(&self, phrase: &str) -> Vec<&Entry> {
-        self.search_gloss_internal(phrase, true)
-    }
-
-    pub fn search_gloss(&self, phrase: &str) -> Vec<&Entry> {
-        self.search_gloss_internal(phrase, false)
-    }
-
-    fn search_gloss_internal(&self, phrase: &str, strict: bool) -> Vec<&Entry> {
-        let mut predicate: Box<dyn FnMut(&Gloss) -> bool> = if strict {
-            Box::new(|g| g.content == Some(phrase.to_owned()))
-        } else {
-            Box::new(|g| match &g.content {
-                Some(t) => t.contains(phrase),
-                None => false,
-            })
-        };
-
-        self.entries
-            .iter()
-            .filter(|e| e.sense.iter().flat_map(|s| &s.gloss).any(|g| predicate(g)))
-            .collect()
+    pub fn antonyms(&self, entry: &Entry) -> Vec<&Entry> {
+        let ant = entry.sense.iter().flat_map(|s| &s.antonyms);
+        ant.flat_map(|a| self.search(&a)).collect()
     }
 }
 
