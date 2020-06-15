@@ -27,5 +27,9 @@ fn kanjidic_works() {
     let path = kanjidic_path.to_str().unwrap();
 
     let dict = Kanjidic::from_file(path).unwrap();
-    println!("{:?}", dict);
+    let _result: Vec<_> = dict
+        .filter_meaning(|m| m.content.contains("book"))
+        .iter()
+        .map(|e| &e.literal)
+        .collect();
 }

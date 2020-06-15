@@ -133,6 +133,21 @@ impl Kanjidic {
     {
         self.entries.iter().filter(|e| predicate(e)).collect()
     }
+
+    pub fn filter_meaning<F>(&self, predicate: F) -> Vec<&Entry>
+    where
+        F: Fn(&Meaning) -> bool,
+    {
+        self.entries
+            .iter()
+            .filter(|e| {
+                e.reading_meanings
+                    .iter()
+                    .flat_map(|rm| &rm.meanings)
+                    .any(|m| predicate(&m))
+            })
+            .collect()
+    }
 }
 
 const_strs!(
