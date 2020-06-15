@@ -23,27 +23,38 @@ impl fmt::Display for ParseError {
     }
 }
 
+impl error::Error for ParseError {
+    fn source(&self) -> Option<&(dyn error::Error + 'static)> {
+        match *self {
+            ParseError::IO(ref err) => Some(err),
+            ParseError::Xml(ref err) => Some(err),
+            ParseError::ParseInt(ref err) => Some(err),
+            ParseError::ParseEnum(ref err) => Some(err),
+        }
+    }
+}
+
 impl From<io::Error> for ParseError {
-    fn from(error: io::Error) -> Self {
-        ParseError::IO(error)
+    fn from(err: io::Error) -> Self {
+        ParseError::IO(err)
     }
 }
 
 impl From<XmlError> for ParseError {
-    fn from(error: XmlError) -> Self {
-        ParseError::Xml(error)
+    fn from(err: XmlError) -> Self {
+        ParseError::Xml(err)
     }
 }
 
 impl From<num::ParseIntError> for ParseError {
-    fn from(error: num::ParseIntError) -> Self {
-        ParseError::ParseInt(error)
+    fn from(err: num::ParseIntError) -> Self {
+        ParseError::ParseInt(err)
     }
 }
 
 impl From<ParseEnumError> for ParseError {
-    fn from(error: ParseEnumError) -> Self {
-        ParseError::ParseEnum(error)
+    fn from(err: ParseEnumError) -> Self {
+        ParseError::ParseEnum(err)
     }
 }
 
