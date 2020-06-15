@@ -13,6 +13,13 @@ pub struct Sentence {
 }
 
 impl Tatoeba {
+    pub fn filter_substring(&self, substr: &str) -> Vec<&Sentence> {
+        self.entries
+            .iter()
+            .filter(|s| s.content.contains(substr))
+            .collect()
+    }
+
     pub fn from_file_jp<P: AsRef<Path>>(filepath: P) -> Result<Self, ParseError> {
         Tatoeba::from_file(filepath, Some(|s: &str| s == "jpn"))
     }

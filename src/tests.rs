@@ -42,5 +42,5 @@ fn tatoeba_works() {
     let sentences_path = sentences_path.to_str().unwrap();
 
     let dict = Tatoeba::from_file_jp(sentences_path).unwrap();
-    let _result: Vec<_> = dict.entries.iter().map(|e| &e.content).collect();
+    let _result: Vec<_> = dict.filter_substring("心");
 }
