@@ -9,7 +9,7 @@ pub struct JMDict {
 
 #[derive(Debug)]
 pub struct Entry {
-    pub seq: i32,
+    pub seq: u32,
     pub reading: Vec<Reading>,
     pub kanji: Vec<Kanji>,
     pub sense: Vec<Sense>,
@@ -39,7 +39,7 @@ pub enum PriRef {
     Spec2,
     Gai1,
     Gai2,
-    NF(i32),
+    NF(u32),
 }
 
 #[derive(Debug)]
@@ -81,7 +81,7 @@ pub struct LSource {
 }
 
 impl JMDict {
-    pub fn find_seq(&self, seq: i32) -> Option<&Entry> {
+    pub fn find_seq(&self, seq: u32) -> Option<&Entry> {
         self.entries.iter().find(|e| e.seq == seq)
     }
 
@@ -166,7 +166,7 @@ fn parse_entry(n: Node) -> Result<Entry, ParserError> {
     let mut kanji = Vec::new();
     let mut sense = Vec::new();
 
-    let seq: i32 = {
+    let seq: u32 = {
         let seq_text = find_child_tag(n, SEQ).and_then(|t| t.text());
 
         match seq_text {

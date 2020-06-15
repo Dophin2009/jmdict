@@ -4,7 +4,7 @@ use roxmltree::{Document, Node};
 
 #[derive(Debug)]
 pub struct Kanjidic {
-    pub file_version: i32,
+    pub file_version: u32,
     pub database_version: String,
     pub creation_date: String,
 
@@ -20,12 +20,12 @@ pub struct Entry {
     pub nanori_readings: Vec<String>,
 
     pub radicals: Vec<Radical>,
-    pub stroke_count: i32,
-    pub stroke_miscounts: Vec<i32>,
+    pub stroke_count: u32,
+    pub stroke_miscounts: Vec<u32>,
 
     pub grade: Option<Grade>,
-    pub freq: Option<i32>,
-    pub old_jlpt: Option<i32>,
+    pub freq: Option<u32>,
+    pub old_jlpt: Option<u32>,
     pub dic_refs: Vec<DicRef>,
 }
 
@@ -75,7 +75,7 @@ pub struct Meaning {
 #[derive(Debug)]
 pub struct Radical {
     pub classification: RadicalType,
-    pub value: i32,
+    pub value: u32,
 }
 
 #[derive(Debug)]
@@ -86,7 +86,7 @@ pub enum RadicalType {
 
 #[derive(Debug)]
 pub enum Grade {
-    Kyouiku(i32),
+    Kyouiku(u32),
     Jouyou,
     Jinmeiyou,
     JouyouVariant,
@@ -106,7 +106,7 @@ pub enum DicRef {
     OneillNames(String),
     OneillKK(String),
     NeillKK(String),
-    Moro(String, Option<i32>, Option<i32>),
+    Moro(String, Option<u32>, Option<u32>),
     Henshall(String),
     SHKK(String),
     SHKK2(String),
@@ -170,7 +170,7 @@ const_strs!(
     CREATION_DATE: "date_of_creation",
 );
 
-fn parse_header(header: Node) -> Result<(i32, String, String), ParserError> {
+fn parse_header(header: Node) -> Result<(u32, String, String), ParserError> {
     let file_version_node = find_child_tag_err(header, FILE_VERSION)?;
     let file_version = get_node_text(file_version_node)?.parse()?;
 
@@ -286,12 +286,12 @@ fn parse_radical(n: Node) -> Result<Radical, ParserError> {
 }
 
 struct Misc {
-    stroke_count: i32,
-    stroke_miscounts: Vec<i32>,
+    stroke_count: u32,
+    stroke_miscounts: Vec<u32>,
 
     grade: Option<Grade>,
-    freq: Option<i32>,
-    old_jlpt: Option<i32>,
+    freq: Option<u32>,
+    old_jlpt: Option<u32>,
 }
 
 const_strs!(
@@ -303,9 +303,9 @@ const_strs!(
 
 fn parse_misc(n: Node) -> Result<Misc, ParserError> {
     let mut grade: Option<Grade> = None;
-    let mut stroke_counts: Vec<i32> = Vec::new();
-    let mut freq: Option<i32> = None;
-    let mut old_jlpt: Option<i32> = None;
+    let mut stroke_counts: Vec<u32> = Vec::new();
+    let mut freq: Option<u32> = None;
+    let mut old_jlpt: Option<u32> = None;
 
     for c in n.children() {
         let tag_name = c.tag_name().name();
