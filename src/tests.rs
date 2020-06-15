@@ -1,4 +1,5 @@
 use crate::jmdict::JMDict;
+use crate::kanjidic::Kanjidic;
 use std::env;
 
 #[test]
@@ -17,4 +18,14 @@ fn jmdict_works() {
         .flat_map(|e| &e.kanji)
         .map(|k| &k.text)
         .collect();
+}
+
+#[test]
+fn kanjidic_works() {
+    let cwd = env::current_dir().unwrap();
+    let kanjidic_path = cwd.join("kanjidic2.xml");
+    let path = kanjidic_path.to_str().unwrap();
+
+    let dict = Kanjidic::from_file(path).unwrap();
+    println!("{:?}", dict);
 }
