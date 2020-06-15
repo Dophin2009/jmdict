@@ -1,7 +1,6 @@
-use crate::errors::ParserError;
+use crate::errors::{InvalidEnumError, ParserError};
 use crate::util;
 use roxmltree::{Document, Node};
-use std::str::FromStr;
 
 #[derive(Debug)]
 pub struct JMDict {
@@ -39,34 +38,6 @@ pub enum PriRef {
     Gai1,
     Gai2,
     NF(i32),
-}
-
-impl FromStr for PriRef {
-    type Err = ();
-
-    fn from_str(s: &str) -> Result<Self, ()> {
-        match &*s.to_lowercase() {
-            "news1" => Ok(PriRef::News1),
-            "news2" => Ok(PriRef::News2),
-            "ichi1" => Ok(PriRef::Ichi1),
-            "ichi2" => Ok(PriRef::Ichi2),
-            "spec1" => Ok(PriRef::Spec1),
-            "spec2" => Ok(PriRef::Spec2),
-            "gai1" => Ok(PriRef::Gai1),
-            "gai2" => Ok(PriRef::Gai2),
-            x => {
-                if x.starts_with("nf") {
-                    let xn: String = x.chars().skip(2).collect();
-                    match xn.parse() {
-                        Ok(n) => Ok(PriRef::NF(n)),
-                        Err(_) => Err(()),
-                    }
-                } else {
-                    Err(())
-                }
-            }
-        }
-    }
 }
 
 #[derive(Debug)]
@@ -262,7 +233,7 @@ fn parse_reading(n: Node) -> Result<Reading, ParserError> {
 
     let re_pri = util::find_child_tag(n, READING_PRI)
         .and_then(|r| r.text())
-        .and_then(|t| t.parse().ok());
+        .and_then(|t| parse_pri_ref(t).ok());
 
     Ok(Reading {
         text: reb.to_owned(),
@@ -277,12 +248,39 @@ fn parse_kanji(n: Node) -> Result<Kanji, ParserError> {
 
     let ke_pri = util::find_child_tag(n, KANJI_PRI)
         .and_then(|k| k.text())
-        .and_then(|t| t.parse().ok());
+        .and_then(|t| parse_pri_ref(t).ok());
 
     Ok(Kanji {
         text: keb.to_owned(),
         pri_ref: ke_pri,
     })
+}
+
+fn parse_pri_ref(t: &str) -> Result<PriRef, ParserError> {
+    match t {
+        "news1" => Ok(PriRef::News1),
+        "news2" => Ok(PriRef::News2),
+        "ichi1" => Ok(PriRef::Ichi1),
+        "ichi2" => Ok(PriRef::Ichi2),
+        "spec1" => Ok(PriRef::Spec1),
+        "spec2" => Ok(PriRef::Spec2),
+        "gai1" => Ok(PriRef::Gai1),
+        "gai2" => Ok(PriRef::Gai2),
+        x => {
+            let valids = &[
+                "news1", "news2", "ichi1", "ichi2", "spec1", "spec2", "gai1", "gai2", "nfxx",
+            ];
+            if x.starts_with("nf") {
+                let xn: String = x.chars().skip(2).collect();
+                match xn.parse() {
+                    Ok(n) => Ok(PriRef::NF(n)),
+                    Err(err) => Err(err.into()),
+                }
+            } else {
+                Err(InvalidEnumError::new(x, valids).into())
+            }
+        }
+    }
 }
 
 fn parse_sense(n: Node) -> Result<Sense, ParserError> {
