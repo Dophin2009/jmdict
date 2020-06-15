@@ -212,7 +212,7 @@ impl JMDict {
             .map(|n| parse_entry(n))
             .collect::<Result<Vec<_>, _>>()?;
 
-        return Ok(JMDict { entries });
+        Ok(JMDict { entries })
     }
 }
 
@@ -233,10 +233,6 @@ fn parse_entry(n: Node) -> Result<Entry, ParserError> {
     for c in n.children() {
         let tag = c.tag_name().name();
         let text = c.text();
-
-        if text == None {
-            continue;
-        }
 
         if tag == KANJI_ELE {
             kanji.push(parse_kanji(c)?);
