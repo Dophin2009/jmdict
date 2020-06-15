@@ -8,8 +8,11 @@ use std::num;
 pub enum ParseError {
     IO(io::Error),
     Xml(XmlError),
+    ParseString(String),
     ParseInt(num::ParseIntError),
     ParseEnum(ParseEnumError),
+    ParseLanguage6391(String),
+    ParseLanguage6393(String),
 }
 
 impl fmt::Display for ParseError {
@@ -17,8 +20,15 @@ impl fmt::Display for ParseError {
         match *self {
             ParseError::IO(ref err) => write!(f, "IO error: {}", err),
             ParseError::Xml(ref err) => write!(f, "XML error: {}", err),
+            ParseError::ParseString(ref err_str) => write!(f, "Parse error: {}", err_str),
             ParseError::ParseInt(ref err) => write!(f, "Parse error: {}", err),
             ParseError::ParseEnum(ref err) => write!(f, "Parse error: {}", err),
+            ParseError::ParseLanguage6391(ref lang) => {
+                write!(f, "invalid ISO 639-1 language code: {}", lang)
+            }
+            ParseError::ParseLanguage6393(ref lang) => {
+                write!(f, "invalid ISO 639-3 language code: {}", lang)
+            }
         }
     }
 }
@@ -30,6 +40,7 @@ impl error::Error for ParseError {
             ParseError::Xml(ref err) => Some(err),
             ParseError::ParseInt(ref err) => Some(err),
             ParseError::ParseEnum(ref err) => Some(err),
+            _ => None,
         }
     }
 }

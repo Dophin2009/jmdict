@@ -1,5 +1,6 @@
 use crate::jmdict::JMDict;
 use crate::kanjidic::Kanjidic;
+use crate::tatoeba::Tatoeba;
 use std::env;
 
 #[test]
@@ -32,4 +33,14 @@ fn kanjidic_works() {
         .iter()
         .map(|e| &e.literal)
         .collect();
+}
+
+#[test]
+fn tatoeba_works() {
+    let cwd = env::current_dir().unwrap();
+    let sentences_path = cwd.join("sentences.csv");
+    let sentences_path = sentences_path.to_str().unwrap();
+
+    let dict = Tatoeba::from_file_jp(sentences_path).unwrap();
+    let _result: Vec<_> = dict.entries.iter().map(|e| &e.content).collect();
 }
