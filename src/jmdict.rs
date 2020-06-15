@@ -25,6 +25,8 @@ pub struct Kanji {
 pub struct Reading {
     pub text: String,
     pub pri_ref: Option<PriRef>,
+    pub restrict: Vec<String>,
+    pub inf: Option<String>,
 }
 
 #[derive(Debug)]
@@ -200,19 +202,37 @@ fn parse_entry(n: Node) -> Result<Entry, ParserError> {
 const_strs!(
     READING_TEXT: "reb",
     READING_PRI: "re_pri",
+    READING_RESTRICT: "re_restr",
+    READING_INF: "re_inf"
 );
 
 fn parse_reading(n: Node) -> Result<Reading, ParserError> {
-    let reb_node = find_child_tag_err(n, READING_TEXT)?;
-    let reb = get_node_text(reb_node)?;
+    let mut reb_op: Option<String> = None;
+    let mut re_pri: Option<PriRef> = None;
+    let mut restrict = Vec::new();
+    let mut inf: Option<String> = None;
 
-    let re_pri = find_child_tag(n, READING_PRI)
-        .and_then(|r| r.text())
-        .and_then(|t| parse_pri_ref(t).ok());
+    for c in n.children() {
+        let tag_name = c.tag_name().name();
+        match tag_name {
+            READING_TEXT => reb_op = Some(get_node_text(c)?.into_owned()),
+            READING_PRI => {
+                let re_pri_text = get_node_text(c).ok();
+                re_pri = re_pri_text.and_then(|t| parse_pri_ref(t.as_ref()).ok());
+            }
+            READING_RESTRICT => restrict.push(get_node_text(c)?.into_owned()),
+            READING_INF => inf = Some(get_node_text(c)?.into_owned()),
+            _ => {}
+        }
+    }
+
+    let reb = reb_op.ok_or(ParserError::MissingTag(READING_TEXT.to_owned()))?;
 
     Ok(Reading {
-        text: reb.into_owned(),
+        text: reb,
         pri_ref: re_pri,
+        restrict,
+        inf,
     })
 }
 
