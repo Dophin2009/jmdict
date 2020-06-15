@@ -121,6 +121,19 @@ pub enum DicRef {
     Maniette(String),
 }
 
+impl Kanjidic {
+    pub fn find_literal(&self, literal: &str) -> Option<&Entry> {
+        self.entries.iter().find(|e| e.literal == literal)
+    }
+
+    pub fn filter<F>(&self, predicate: F) -> Vec<&Entry>
+    where
+        F: Fn(&Entry) -> bool,
+    {
+        self.entries.iter().filter(|e| predicate(e)).collect()
+    }
+}
+
 const_strs!(
     ROOT: "kanjidic2",
     HEADER: "header",
