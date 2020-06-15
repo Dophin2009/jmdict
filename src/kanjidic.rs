@@ -1,4 +1,5 @@
 use crate::errors::{InvalidEnumError, ParserError};
+use crate::radicals;
 use crate::util::{self, find_child_tag_err, get_node_attr, get_node_text};
 use roxmltree::{Document, Node};
 
@@ -75,7 +76,7 @@ pub struct Meaning {
 #[derive(Debug)]
 pub struct Radical {
     pub classification: RadicalType,
-    pub value: u32,
+    pub value: String,
 }
 
 #[derive(Debug)]
@@ -277,7 +278,8 @@ fn parse_radical(n: Node) -> Result<Radical, ParserError> {
             return Err(InvalidEnumError::new(classification_attr.as_ref(), valids).into());
         }
     };
-    let value = get_node_text(n)?.parse()?;
+    let value_num = get_node_text(n)?.parse()?;
+    let value = radicals::index_radical(value_num)?;
 
     Ok(Radical {
         classification,
