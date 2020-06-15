@@ -230,8 +230,6 @@ fn parse_entry(n: Node) -> Result<Entry, ParserError> {
         }
     }
 
-    println!("{}", literal_op.clone().unwrap());
-
     let misc = misc_op.ok_or(ParserError::MissingTag(MISC.to_owned()))?;
 
     Ok(Entry {
