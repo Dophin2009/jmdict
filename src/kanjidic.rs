@@ -1,5 +1,5 @@
 use crate::errors::{InvalidEnumError, ParserError};
-use crate::util;
+use crate::util::{self, find_child_tag_err, get_node_attr, get_node_text};
 use roxmltree::{Document, Node};
 
 #[derive(Debug)]
@@ -131,9 +131,9 @@ impl Kanjidic {
     pub fn from_file(filepath: &str) -> Result<Self, ParserError> {
         let contents = util::read_file(filepath)?;
         let doc = Document::parse(&contents)?;
-        let root = util::find_child_tag_err(doc.root(), ROOT)?;
+        let root = find_child_tag_err(doc.root(), ROOT)?;
 
-        let header = util::find_child_tag_err(root, HEADER)?;
+        let header = find_child_tag_err(root, HEADER)?;
         let (file_version, database_version, creation_date) = parse_header(header)?;
 
         let entries: Vec<_> = root
@@ -158,14 +158,14 @@ const_strs!(
 );
 
 fn parse_header(header: Node) -> Result<(i32, String, String), ParserError> {
-    let file_version_node = util::find_child_tag_err(header, FILE_VERSION)?;
-    let file_version = util::get_node_text(file_version_node)?.parse()?;
+    let file_version_node = find_child_tag_err(header, FILE_VERSION)?;
+    let file_version = get_node_text(file_version_node)?.parse()?;
 
-    let database_version_node = util::find_child_tag_err(header, DATABASE_VERSION)?;
-    let database_version = util::get_node_text(database_version_node)?.into_owned();
+    let database_version_node = find_child_tag_err(header, DATABASE_VERSION)?;
+    let database_version = get_node_text(database_version_node)?.into_owned();
 
-    let creation_date_node = util::find_child_tag_err(header, CREATION_DATE)?;
-    let creation_date = util::get_node_text(creation_date_node)?.into_owned();
+    let creation_date_node = find_child_tag_err(header, CREATION_DATE)?;
+    let creation_date = get_node_text(creation_date_node)?.into_owned();
 
     Ok((file_version, database_version, creation_date))
 }
@@ -200,7 +200,7 @@ fn parse_entry(n: Node) -> Result<Entry, ParserError> {
     for c in n.children() {
         let tag_name = c.tag_name().name();
         match tag_name {
-            LITERAL => literal_op = Some(util::get_node_text(c)?.into()),
+            LITERAL => literal_op = Some(get_node_text(c)?.into()),
             CODEPOINT_GROUP => {
                 codepoints_op = Some(
                     c.children()
@@ -250,14 +250,14 @@ fn parse_entry(n: Node) -> Result<Entry, ParserError> {
 }
 
 fn parse_codepoint(n: Node) -> Result<Codepoint, ParserError> {
-    let standard = util::get_node_attr(n, CODEPOINT_TYPE)?.into_owned();
-    let value = util::get_node_text(n)?.into_owned();
+    let standard = get_node_attr(n, CODEPOINT_TYPE)?.into_owned();
+    let value = get_node_text(n)?.into_owned();
 
     Ok(Codepoint { standard, value })
 }
 
 fn parse_radical(n: Node) -> Result<Radical, ParserError> {
-    let classification_attr = util::get_node_attr(n, RADICAL_TYPE)?;
+    let classification_attr = get_node_attr(n, RADICAL_TYPE)?;
     let classification = match classification_attr.as_ref() {
         "classical" => RadicalType::Classical,
         "nelson_c" => RadicalType::NelsonC,
@@ -266,7 +266,7 @@ fn parse_radical(n: Node) -> Result<Radical, ParserError> {
             return Err(InvalidEnumError::new(classification_attr.as_ref(), valids).into());
         }
     };
-    let value = util::get_node_text(n)?.parse()?;
+    let value = get_node_text(n)?.parse()?;
 
     Ok(Radical {
         classification,
@@ -298,7 +298,7 @@ fn parse_misc(n: Node) -> Result<Misc, ParserError> {
 
     for c in n.children() {
         let tag_name = c.tag_name().name();
-        let text = util::get_node_text(c);
+        let text = get_node_text(c);
         match tag_name {
             GRADE => {
                 grade = {
@@ -353,8 +353,8 @@ fn parse_dic_ref_group(n: Node) -> Result<Vec<DicRef>, ParserError> {
 }
 
 fn parse_dic_ref(n: Node) -> Result<DicRef, ParserError> {
-    let num = util::get_node_text(n)?.into_owned();
-    let typ_attr = util::get_node_attr(n, DIC_REF_TYPE)?;
+    let num = get_node_text(n)?.into_owned();
+    let typ_attr = get_node_attr(n, DIC_REF_TYPE)?;
     let typ = typ_attr.as_ref();
     let dic_ref = match typ {
         "nelson_c" => DicRef::NelsonC(num),
@@ -450,7 +450,7 @@ fn parse_reading_meanings(n: Node) -> Result<(Vec<ReadingMeaning>, Vec<String>),
                 reading_meanings.push(rmgroup);
             }
             NANORI => {
-                let text = util::get_node_text(c)?.into_owned();
+                let text = get_node_text(c)?.into_owned();
                 nanori_readings.push(text);
             }
             _ => {}
@@ -473,7 +473,7 @@ fn parse_reading_group(n: Node) -> Result<ReadingMeaning, ParserError> {
             }
             MEANING => {
                 let language = c.attribute(MEANING_LANG).unwrap_or("en").to_owned();
-                let content = util::get_node_text(c)?.into_owned();
+                let content = get_node_text(c)?.into_owned();
                 meanings.push(Meaning { content, language });
             }
             _ => {}
@@ -484,8 +484,8 @@ fn parse_reading_group(n: Node) -> Result<ReadingMeaning, ParserError> {
 }
 
 fn parse_reading(n: Node) -> Result<Reading, ParserError> {
-    let value = util::get_node_text(n)?.into_owned();
-    let typ_attr = util::get_node_attr(n, READING_TYPE)?;
+    let value = get_node_text(n)?.into_owned();
+    let typ_attr = get_node_attr(n, READING_TYPE)?;
     let typ = match typ_attr.as_ref() {
         "pinyin" => ReadingType::Pinyin,
         "korean_r" => ReadingType::KoreanR,
@@ -493,7 +493,7 @@ fn parse_reading(n: Node) -> Result<Reading, ParserError> {
         "vietnam" => ReadingType::Vietnam,
         "ja_on" => {
             let jouyou_approved = get_jouyou_approved(n);
-            let onyomi_typ = match util::get_node_attr(n, READING_ONYOMI_TYPE) {
+            let onyomi_typ = match get_node_attr(n, READING_ONYOMI_TYPE) {
                 Ok(ty) => match ty.as_ref() {
                     "kan" => OnyomiType::Kan,
                     "go" => OnyomiType::Go,
@@ -524,7 +524,7 @@ fn parse_reading(n: Node) -> Result<Reading, ParserError> {
 }
 
 fn get_jouyou_approved(n: Node) -> bool {
-    match util::get_node_attr(n, READING_JA_STATUS) {
+    match get_node_attr(n, READING_JA_STATUS) {
         Ok(_) => true,
         Err(_) => false,
     }

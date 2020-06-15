@@ -1,5 +1,5 @@
 use crate::errors::{InvalidEnumError, ParserError};
-use crate::util;
+use crate::util::{self, find_child_tag, find_child_tag_err, get_node_text, ns_xml_attr};
 use roxmltree::{Document, Node};
 
 #[derive(Debug)]
@@ -165,7 +165,7 @@ fn parse_entry(n: Node) -> Result<Entry, ParserError> {
     let mut sense = Vec::new();
 
     let seq: i32 = {
-        let seq_text = util::find_child_tag(n, SEQ).and_then(|t| t.text());
+        let seq_text = find_child_tag(n, SEQ).and_then(|t| t.text());
 
         match seq_text {
             Some(t) => t.parse()?,
@@ -203,10 +203,10 @@ const_strs!(
 );
 
 fn parse_reading(n: Node) -> Result<Reading, ParserError> {
-    let reb_node = util::find_child_tag_err(n, READING_TEXT)?;
-    let reb = util::get_node_text(reb_node)?;
+    let reb_node = find_child_tag_err(n, READING_TEXT)?;
+    let reb = get_node_text(reb_node)?;
 
-    let re_pri = util::find_child_tag(n, READING_PRI)
+    let re_pri = find_child_tag(n, READING_PRI)
         .and_then(|r| r.text())
         .and_then(|t| parse_pri_ref(t).ok());
 
@@ -222,10 +222,10 @@ const_strs!(
 );
 
 fn parse_kanji(n: Node) -> Result<Kanji, ParserError> {
-    let keb_node = util::find_child_tag_err(n, KANJI_TEXT)?;
-    let keb = util::get_node_text(keb_node)?;
+    let keb_node = find_child_tag_err(n, KANJI_TEXT)?;
+    let keb = get_node_text(keb_node)?;
 
-    let ke_pri = util::find_child_tag(n, KANJI_PRI)
+    let ke_pri = find_child_tag(n, KANJI_PRI)
         .and_then(|k| k.text())
         .and_then(|t| parse_pri_ref(t).ok());
 
@@ -303,7 +303,7 @@ fn parse_sense(n: Node) -> Result<Sense, ParserError> {
 
     for c in n.children() {
         let tag = c.tag_name().name();
-        let text = util::get_node_text(c);
+        let text = get_node_text(c);
         match tag {
             RESTRICT_READING => sense.restrict_reading.push(text?.into_owned()),
             RESTRICT_KANJI => sense.restrict_kanji.push(text?.into_owned()),
@@ -317,7 +317,7 @@ fn parse_sense(n: Node) -> Result<Sense, ParserError> {
             LSOURCE => {
                 let content = text.ok().and_then(|t| Some(t.into_owned()));
                 let lang = c
-                    .attribute(util::ns_xml_attr(LSOURCE_LANG_SUFFIX))
+                    .attribute(ns_xml_attr(LSOURCE_LANG_SUFFIX))
                     .unwrap_or_else(|| LSOURCE_LANG_DEF)
                     .to_owned();
                 let full = c.attribute(LSOURCE_TYPE).map_or(true, |_| false);
@@ -333,7 +333,7 @@ fn parse_sense(n: Node) -> Result<Sense, ParserError> {
             GLOSS => {
                 let content = text.ok().and_then(|t| Some(t.into_owned()));
                 let lang = c
-                    .attribute(util::ns_xml_attr(GLOSS_LANG_SUFFIX))
+                    .attribute(ns_xml_attr(GLOSS_LANG_SUFFIX))
                     .unwrap_or_else(|| GLOSS_LANG_DEFAULT)
                     .to_owned();
                 let gender = c.attribute(GLOSS_GENDER).and_then(|g| Some(g.to_owned()));
