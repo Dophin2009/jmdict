@@ -136,41 +136,6 @@ impl JMDict {
     }
 }
 
-const_strs!(
-    SEQ: "ent_seq",
-
-    KANJI_ELE: "k_ele",
-    KANJI_TEXT: "keb",
-    KANJI_PRI: "ke_pri",
-
-    READING_ELE: "r_ele",
-    READING_TEXT: "reb",
-    READING_PRI: "re_pri",
-
-    SENSE: "sense",
-    RESTRICT_KANJI: "stagk",
-    RESTRICT_READING: "stagr",
-    CROSS_REF: "xref",
-    ANTONYM: "ant",
-    POS: "pos",
-    FIELD: "field",
-    MISC: "misc",
-    DIALECT: "dial",
-    INFO: "s_inf",
-
-    LSOURCE: "lsource",
-    LSOURCE_LANG_SUFFIX: "lang",
-    LSOURCE_LANG_DEF: "eng",
-    LSOURCE_TYPE: "ls_type",
-    LSOURCE_WASEI: "ls_wasei",
-
-    GLOSS: "gloss",
-    GLOSS_LANG_SUFFIX: "lang",
-    GLOSS_LANG_DEFAULT: "eng",
-    GLOSS_GENDER: "g_gend",
-    GLOSS_TYPE: "g_type"
-);
-
 impl JMDict {
     pub fn from_file(filepath: &str) -> Result<Self, ParserError> {
         let contents = util::read_file(filepath)?;
@@ -186,6 +151,13 @@ impl JMDict {
         Ok(JMDict { entries })
     }
 }
+
+const_strs!(
+    SEQ: "ent_seq",
+    KANJI_ELE: "k_ele",
+    READING_ELE: "r_ele",
+    SENSE: "sense",
+);
 
 fn parse_entry(n: Node) -> Result<Entry, ParserError> {
     let mut reading = Vec::new();
@@ -203,7 +175,6 @@ fn parse_entry(n: Node) -> Result<Entry, ParserError> {
 
     for c in n.children() {
         let tag = c.tag_name().name();
-        let text = c.text();
 
         if tag == KANJI_ELE {
             kanji.push(parse_kanji(c)?);
@@ -226,6 +197,11 @@ fn parse_entry(n: Node) -> Result<Entry, ParserError> {
     })
 }
 
+const_strs!(
+    READING_TEXT: "reb",
+    READING_PRI: "re_pri",
+);
+
 fn parse_reading(n: Node) -> Result<Reading, ParserError> {
     let reb_node = util::find_child_tag(n, READING_TEXT)
         .ok_or(ParserError::MissingTag(READING_TEXT.to_owned()))?;
@@ -240,6 +216,11 @@ fn parse_reading(n: Node) -> Result<Reading, ParserError> {
         pri_ref: re_pri,
     })
 }
+
+const_strs!(
+    KANJI_TEXT: "keb",
+    KANJI_PRI: "ke_pri",
+);
 
 fn parse_kanji(n: Node) -> Result<Kanji, ParserError> {
     let keb_node = util::find_child_tag(n, KANJI_TEXT)
@@ -282,6 +263,30 @@ fn parse_pri_ref(t: &str) -> Result<PriRef, ParserError> {
         }
     }
 }
+
+const_strs!(
+    RESTRICT_KANJI: "stagk",
+    RESTRICT_READING: "stagr",
+    CROSS_REF: "xref",
+    ANTONYM: "ant",
+    POS: "pos",
+    FIELD: "field",
+    MISC: "misc",
+    DIALECT: "dial",
+    INFO: "s_inf",
+
+    LSOURCE: "lsource",
+    LSOURCE_LANG_SUFFIX: "lang",
+    LSOURCE_LANG_DEF: "eng",
+    LSOURCE_TYPE: "ls_type",
+    LSOURCE_WASEI: "ls_wasei",
+
+    GLOSS: "gloss",
+    GLOSS_LANG_SUFFIX: "lang",
+    GLOSS_LANG_DEFAULT: "eng",
+    GLOSS_GENDER: "g_gend",
+    GLOSS_TYPE: "g_type"
+);
 
 fn parse_sense(n: Node) -> Result<Sense, ParserError> {
     let mut sense = Sense {
