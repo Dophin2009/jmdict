@@ -203,16 +203,15 @@ const_strs!(
 );
 
 fn parse_reading(n: Node) -> Result<Reading, ParserError> {
-    let reb_node = util::find_child_tag(n, READING_TEXT)
-        .ok_or(ParserError::MissingTag(READING_TEXT.to_owned()))?;
-    let reb = reb_node.text().ok_or(ParserError::MissingText)?;
+    let reb_node = util::find_child_tag_err(n, READING_TEXT)?;
+    let reb = util::get_node_text(reb_node)?;
 
     let re_pri = util::find_child_tag(n, READING_PRI)
         .and_then(|r| r.text())
         .and_then(|t| parse_pri_ref(t).ok());
 
     Ok(Reading {
-        text: reb.to_owned(),
+        text: reb.into_owned(),
         pri_ref: re_pri,
     })
 }
@@ -223,16 +222,15 @@ const_strs!(
 );
 
 fn parse_kanji(n: Node) -> Result<Kanji, ParserError> {
-    let keb_node = util::find_child_tag(n, KANJI_TEXT)
-        .ok_or(ParserError::MissingTag(KANJI_TEXT.to_owned()))?;
-    let keb = keb_node.text().ok_or(ParserError::MissingText)?;
+    let keb_node = util::find_child_tag_err(n, KANJI_TEXT)?;
+    let keb = util::get_node_text(keb_node)?;
 
     let ke_pri = util::find_child_tag(n, KANJI_PRI)
         .and_then(|k| k.text())
         .and_then(|t| parse_pri_ref(t).ok());
 
     Ok(Kanji {
-        text: keb.to_owned(),
+        text: keb.into_owned(),
         pri_ref: ke_pri,
     })
 }
