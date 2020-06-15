@@ -1,4 +1,4 @@
-use crate::errors::{InvalidEnumError, ParserError};
+use crate::errors::{ParseEnumError, ParseError, XmlError};
 use crate::radicals;
 use crate::util::{self, find_child_tag_err, get_node_attr, get_node_text};
 use roxmltree::{Document, Node};
@@ -157,9 +157,9 @@ const_strs!(
 );
 
 impl Kanjidic {
-    pub fn from_file(filepath: &str) -> Result<Self, ParserError> {
+    pub fn from_file(filepath: &str) -> Result<Self, ParseError> {
         let contents = util::read_file(filepath)?;
-        let doc = Document::parse(&contents)?;
+        let doc = Document::parse(&contents).map_err(XmlError::Roxml)?;
         let root = find_child_tag_err(doc.root(), ROOT)?;
 
         let header = find_child_tag_err(root, HEADER)?;
@@ -186,7 +186,7 @@ const_strs!(
     CREATION_DATE: "date_of_creation",
 );
 
-fn parse_header(header: Node) -> Result<(u32, String, String), ParserError> {
+fn parse_header(header: Node) -> Result<(u32, String, String), ParseError> {
     let file_version_node = find_child_tag_err(header, FILE_VERSION)?;
     let file_version = get_node_text(file_version_node)?.parse()?;
 
@@ -217,7 +217,7 @@ const_strs!(
     READING_GROUP: "reading_meaning",
 );
 
-fn parse_entry(n: Node) -> Result<Entry, ParserError> {
+fn parse_entry(n: Node) -> Result<Entry, ParseError> {
     let mut literal_op: Option<String> = None;
     let mut codepoints_op: Option<Vec<Codepoint>> = None;
     let mut radicals_op: Option<Vec<Radical>> = None;
@@ -259,12 +259,12 @@ fn parse_entry(n: Node) -> Result<Entry, ParserError> {
         }
     }
 
-    let misc = misc_op.ok_or(ParserError::MissingTag(MISC.to_owned()))?;
+    let misc = misc_op.ok_or(XmlError::MissingTag(MISC.to_owned()))?;
 
     Ok(Entry {
-        literal: literal_op.ok_or(ParserError::MissingTag(LITERAL.to_owned()))?,
-        codepoints: codepoints_op.ok_or(ParserError::MissingTag(CODEPOINT_GROUP.to_owned()))?,
-        radicals: radicals_op.ok_or(ParserError::MissingTag(RADICAL_GROUP.to_owned()))?,
+        literal: literal_op.ok_or(XmlError::MissingTag(LITERAL.to_owned()))?,
+        codepoints: codepoints_op.ok_or(XmlError::MissingTag(CODEPOINT_GROUP.to_owned()))?,
+        radicals: radicals_op.ok_or(XmlError::MissingTag(RADICAL_GROUP.to_owned()))?,
         grade: misc.grade,
         stroke_count: misc.stroke_count,
         stroke_miscounts: misc.stroke_miscounts,
@@ -276,21 +276,21 @@ fn parse_entry(n: Node) -> Result<Entry, ParserError> {
     })
 }
 
-fn parse_codepoint(n: Node) -> Result<Codepoint, ParserError> {
+fn parse_codepoint(n: Node) -> Result<Codepoint, ParseError> {
     let standard = get_node_attr(n, CODEPOINT_TYPE)?.into_owned();
     let value = get_node_text(n)?.into_owned();
 
     Ok(Codepoint { standard, value })
 }
 
-fn parse_radical(n: Node) -> Result<Radical, ParserError> {
+fn parse_radical(n: Node) -> Result<Radical, ParseError> {
     let classification_attr = get_node_attr(n, RADICAL_TYPE)?;
     let classification = match classification_attr.as_ref() {
         "classical" => RadicalType::Classical,
         "nelson_c" => RadicalType::NelsonC,
         _ => {
-            let valids = &["classical", "nelson_c"];
-            return Err(InvalidEnumError::new(classification_attr.as_ref(), valids).into());
+            let valids = vec!["classical", "nelson_c"];
+            return Err(ParseEnumError::new(classification_attr.as_ref(), valids).into());
         }
     };
     let value_num = get_node_text(n)?.parse()?;
@@ -318,7 +318,7 @@ const_strs!(
     JLPT: "jlpt",
 );
 
-fn parse_misc(n: Node) -> Result<Misc, ParserError> {
+fn parse_misc(n: Node) -> Result<Misc, ParseError> {
     let mut grade: Option<Grade> = None;
     let mut stroke_counts: Vec<u32> = Vec::new();
     let mut freq: Option<u32> = None;
@@ -338,7 +338,7 @@ fn parse_misc(n: Node) -> Result<Misc, ParserError> {
                         10 => Some(Grade::JouyouVariant),
                         _ => {
                             let valids: Vec<_> = vec!["1", "2", "3", "4", "5", "6", "8", "9", "10"];
-                            return Err(InvalidEnumError::new(&i.to_string(), &valids).into());
+                            return Err(ParseEnumError::new(&i.to_string(), valids).into());
                         }
                     }
                 }
@@ -352,7 +352,7 @@ fn parse_misc(n: Node) -> Result<Misc, ParserError> {
 
     let stroke_count = stroke_counts
         .first()
-        .ok_or(ParserError::MissingTag(STROKE_COUNT.to_owned()))?
+        .ok_or(XmlError::MissingTag(STROKE_COUNT.to_owned()))?
         .to_owned();
     let stroke_miscounts: Vec<_> = stroke_counts[1..].to_vec();
 
@@ -373,14 +373,14 @@ const_strs!(
     MORO_PAGE: "m_page"
 );
 
-fn parse_dic_ref_group(n: Node) -> Result<Vec<DicRef>, ParserError> {
+fn parse_dic_ref_group(n: Node) -> Result<Vec<DicRef>, ParseError> {
     n.children()
         .filter(|c| c.tag_name().name() == DIC_REF)
         .map(|c| parse_dic_ref(c))
         .collect()
 }
 
-fn parse_dic_ref(n: Node) -> Result<DicRef, ParserError> {
+fn parse_dic_ref(n: Node) -> Result<DicRef, ParseError> {
     let num = get_node_text(n)?.into_owned();
     let typ_attr = get_node_attr(n, DIC_REF_TYPE)?;
     let typ = typ_attr.as_ref();
@@ -421,7 +421,7 @@ fn parse_dic_ref(n: Node) -> Result<DicRef, ParserError> {
             DicRef::Moro(num, vol, page)
         }
         _ => {
-            let valids = &vec![
+            let valids = vec![
                 "nelson_c",
                 "nelson_c",
                 "halpern_njecd",
@@ -446,8 +446,8 @@ fn parse_dic_ref(n: Node) -> Result<DicRef, ParserError> {
                 "kodansha_compact",
                 "maniette",
                 "moro",
-            ][..];
-            return Err(InvalidEnumError::new(typ, valids).into());
+            ];
+            return Err(ParseEnumError::new(typ, valids).into());
         }
     };
 
@@ -466,7 +466,7 @@ const_strs!(
     NANORI: "nanori"
 );
 
-fn parse_reading_meanings(n: Node) -> Result<(Vec<ReadingMeaning>, Vec<String>), ParserError> {
+fn parse_reading_meanings(n: Node) -> Result<(Vec<ReadingMeaning>, Vec<String>), ParseError> {
     let mut reading_meanings = Vec::new();
     let mut nanori_readings = Vec::new();
 
@@ -488,7 +488,7 @@ fn parse_reading_meanings(n: Node) -> Result<(Vec<ReadingMeaning>, Vec<String>),
     Ok((reading_meanings, nanori_readings))
 }
 
-fn parse_reading_group(n: Node) -> Result<ReadingMeaning, ParserError> {
+fn parse_reading_group(n: Node) -> Result<ReadingMeaning, ParseError> {
     let mut readings = Vec::new();
     let mut meanings = Vec::new();
 
@@ -511,7 +511,7 @@ fn parse_reading_group(n: Node) -> Result<ReadingMeaning, ParserError> {
     Ok(ReadingMeaning { readings, meanings })
 }
 
-fn parse_reading(n: Node) -> Result<Reading, ParserError> {
+fn parse_reading(n: Node) -> Result<Reading, ParseError> {
     let value = get_node_text(n)?.into_owned();
     let typ_attr = get_node_attr(n, READING_TYPE)?;
     let typ = match typ_attr.as_ref() {
@@ -528,8 +528,8 @@ fn parse_reading(n: Node) -> Result<Reading, ParserError> {
                     "tou" => OnyomiType::Tou,
                     "kan'you" => OnyomiType::Kanyou,
                     _ => {
-                        let valids = &["kan", "go", "tou", "kan'you"];
-                        return Err(InvalidEnumError::new(ty.as_ref(), valids).into());
+                        let valids = vec!["kan", "go", "tou", "kan'you"];
+                        return Err(ParseEnumError::new(ty.as_ref(), valids).into());
                     }
                 },
                 Err(_) => OnyomiType::None,
@@ -541,10 +541,10 @@ fn parse_reading(n: Node) -> Result<Reading, ParserError> {
             ReadingType::Kunyomi(jouyou_approved)
         }
         _ => {
-            let valids = &[
+            let valids = vec![
                 "pinyin", "korean_r", "korean_h", "vietnam", "ja_on", "ja_kun",
             ];
-            return Err(InvalidEnumError::new(typ_attr.as_ref(), valids).into());
+            return Err(ParseEnumError::new(typ_attr.as_ref(), valids).into());
         }
     };
 

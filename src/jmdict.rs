@@ -1,4 +1,4 @@
-use crate::errors::{InvalidEnumError, ParserError};
+use crate::errors::{ParseEnumError, ParseError, XmlError};
 use crate::util::{self, find_child_tag, find_child_tag_err, get_node_text, ns_xml_attr};
 use roxmltree::{Document, Node};
 
@@ -139,9 +139,9 @@ impl JMDict {
 }
 
 impl JMDict {
-    pub fn from_file(filepath: &str) -> Result<Self, ParserError> {
+    pub fn from_file(filepath: &str) -> Result<Self, ParseError> {
         let contents = util::read_file(filepath)?;
-        let doc = Document::parse(&contents)?;
+        let doc = Document::parse(&contents).map_err(XmlError::Roxml)?;
 
         let entries: Vec<_> = doc
             .root_element()
@@ -161,7 +161,7 @@ const_strs!(
     SENSE: "sense",
 );
 
-fn parse_entry(n: Node) -> Result<Entry, ParserError> {
+fn parse_entry(n: Node) -> Result<Entry, ParseError> {
     let mut reading = Vec::new();
     let mut kanji = Vec::new();
     let mut sense = Vec::new();
@@ -171,7 +171,7 @@ fn parse_entry(n: Node) -> Result<Entry, ParserError> {
 
         match seq_text {
             Some(t) => t.parse()?,
-            None => return Err(ParserError::MissingTag(SEQ.to_owned())),
+            None => return Err(XmlError::MissingTag(SEQ.to_owned()).into()),
         }
     };
 
@@ -206,7 +206,7 @@ const_strs!(
     READING_INF: "re_inf"
 );
 
-fn parse_reading(n: Node) -> Result<Reading, ParserError> {
+fn parse_reading(n: Node) -> Result<Reading, ParseError> {
     let mut reb_op: Option<String> = None;
     let mut re_pri: Option<PriRef> = None;
     let mut restrict = Vec::new();
@@ -226,7 +226,7 @@ fn parse_reading(n: Node) -> Result<Reading, ParserError> {
         }
     }
 
-    let reb = reb_op.ok_or(ParserError::MissingTag(READING_TEXT.to_owned()))?;
+    let reb = reb_op.ok_or(XmlError::MissingTag(READING_TEXT.to_owned()))?;
 
     Ok(Reading {
         text: reb,
@@ -241,7 +241,7 @@ const_strs!(
     KANJI_PRI: "ke_pri",
 );
 
-fn parse_kanji(n: Node) -> Result<Kanji, ParserError> {
+fn parse_kanji(n: Node) -> Result<Kanji, ParseError> {
     let keb_node = find_child_tag_err(n, KANJI_TEXT)?;
     let keb = get_node_text(keb_node)?;
 
@@ -255,7 +255,7 @@ fn parse_kanji(n: Node) -> Result<Kanji, ParserError> {
     })
 }
 
-fn parse_pri_ref(t: &str) -> Result<PriRef, ParserError> {
+fn parse_pri_ref(t: &str) -> Result<PriRef, ParseError> {
     match t {
         "news1" => Ok(PriRef::News1),
         "news2" => Ok(PriRef::News2),
@@ -266,7 +266,7 @@ fn parse_pri_ref(t: &str) -> Result<PriRef, ParserError> {
         "gai1" => Ok(PriRef::Gai1),
         "gai2" => Ok(PriRef::Gai2),
         x => {
-            let valids = &[
+            let valids = vec![
                 "news1", "news2", "ichi1", "ichi2", "spec1", "spec2", "gai1", "gai2", "nfxx",
             ];
             if x.starts_with("nf") {
@@ -276,7 +276,7 @@ fn parse_pri_ref(t: &str) -> Result<PriRef, ParserError> {
                     Err(err) => Err(err.into()),
                 }
             } else {
-                Err(InvalidEnumError::new(x, valids).into())
+                Err(ParseEnumError::new(x, valids).into())
             }
         }
     }
@@ -306,7 +306,7 @@ const_strs!(
     GLOSS_TYPE: "g_type"
 );
 
-fn parse_sense(n: Node) -> Result<Sense, ParserError> {
+fn parse_sense(n: Node) -> Result<Sense, ParseError> {
     let mut sense = Sense {
         restrict_reading: Vec::new(),
         restrict_kanji: Vec::new(),

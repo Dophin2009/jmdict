@@ -1,6 +1,6 @@
-use crate::errors::InvalidEnumError;
+use crate::errors::ParseEnumError;
 
-pub fn index_radical(i: u32) -> Result<String, InvalidEnumError> {
+pub fn index_radical(i: u32) -> Result<String, ParseEnumError> {
     let rad = match i {
         1 => "一",
         2 => "丨",
@@ -217,7 +217,7 @@ pub fn index_radical(i: u32) -> Result<String, InvalidEnumError> {
         213 => "龜",
         214 => "龠",
         _ => {
-            return Err(InvalidEnumError::new(&i.to_string(), &["1--214"]));
+            return Err(ParseEnumError::new(&i.to_string(), vec!["1--214"]));
         }
     };
     Ok(rad.to_owned())
